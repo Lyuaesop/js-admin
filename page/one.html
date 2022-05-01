@@ -1,0 +1,127 @@
+<div class='layuimini-container layuimini-page-anim'>
+  <div class='layuimini-main'>
+    <fieldset class='table-search-fieldset'>
+      <legend t='search_tip'></legend>
+      <form class='layui-form'>
+        <div class='layui-form-item'>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='start_time'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' id='start_time' name='c_start' p='pls_select_start_time' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='end_time'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' id='end_time' name='c_end' p='pls_select_end_time' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='username'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' name='username' p='pls_input_username' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='agent_id'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' name='guid' p='pls_input_agent_id' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='member_type'></label>
+            <div class='layui-input-inline'>
+              <select name='type'>
+                <option value='0' selected t='all_member'></option>
+                <option value='1' t='normal_member'></option>
+                <option value='2' t='agent_member'></option>
+              </select>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <button type='submit' class='layui-btn layui-btn-primary' lay-submit lay-filter='search'><i class='layui-icon'></i> <span t='search'></span></button>
+            <button type='reset' class='layui-btn layui-btn-primary' t='search_reset'></button>
+          </div>
+        </div>
+      </form>
+    </fieldset>
+    <script type='text/html' id='tool'></script>
+    <table class='layui-hide' id='list' lay-filter='list'></table>
+  </div>
+</div>
+
+<style>
+  .layui-inline{margin-right:0 !important}
+  .layui-inline label{width:auto !important;padding:9px !important}
+  .layui-input-inline{width:auto !important;max-width:160px !important;margin:0 !important}
+  button[type=submit]{margin-left:10px}
+  td[data-field=username].with-children{color:deepskyblue;cursor:pointer}
+</style>
+
+<script>
+  layui.use(['jquery', 'form', 'table', 'element', 'laydate'], function () {
+    const $ = layui.jquery, form = layui.form, table = layui.table, laydate = layui.laydate;
+    setTimeout(() => form.render(), 500);
+    laydate.render({elem: '#start_time', type: 'date', lang: localStorage.getItem('lang')});
+    laydate.render({elem: '#end_time', type: 'date', lang: localStorage.getItem('lang')});
+    let pid = 0, mapper = {};
+    const ipC = Site.platform === 'inner' ? [{field: 'ip', width: 120, title: Site.i18n.ip}] : [];
+    const nickC = Site.platform === 'inner' ? [{field: 'nickname', fixed: 'left', width: 120, title: Site.i18n.nickname}] : [];
+    table.render({
+      elem: '#list', method: 'get',
+      api: 'Agent_Agent.GetUserReportAll',
+      where: {token: sessionStorage.getItem('token'), user_id: sessionStorage.getItem('uid'), lang: Site.lang},
+      request: {pageName: 'page', limitName: 'perpage'},
+      parseData: function (r) {
+        const count = r.data.count && !isNaN(r.data.count) && r.data.count > 0 ? r.data.count : 0;
+        const items = r.data.data && Type(r.data.data) === 'array' ? r.data.data : [];
+        const list = items.map(v => {
+          mapper[v.id] = v.childs > 0;
+          v.nickname = v.nickname || '-';
+          v.addtime = Time('Y/M/D H:I:S', new Date(v.addtime * 1000));
+          if (v.last_login_time) v.last_login_time = Time('Y/M/D H:I:S', new Date(v.last_login_time * 1000));
+          return v;
+        });
+        return {code: r.ret == 200 ? 0 : r.ret, msg: r.msg, count: count, data: list};
+      },
+      toolbar: '#tool', defaultToolbar: ['filter', 'print'],
+      cols: [[
+        {field: 'id', width: 100, fixed: 'left', title: Site.i18n.user_id},
+        {field: 'username', width: 120, fixed: 'left', title: Site.i18n.username},
+        ...nickC,
+        {field: 'parent', width: 120, fixed: 'left', title: Site.i18n.parent_agent, sort: true},
+        {field: 'balance', width: 80, title: Site.i18n.balance},
+        {field: 'allRecharge', minWidth: 180, title: Site.i18n.recharge_total},
+        {field: 'allWithdraw', minWidth: 180, title: Site.i18n.withdraw_total},
+        {field: 'todayRecharge', minWidth: 180, title: Site.i18n.today_recharge},
+        {field: 'todayWithdraw', minWidth: 180, title: Site.i18n.today_withdraw},
+        {field: 'allTips', minWidth: 180, title: Site.i18n.fee_total},
+        {field: 'allAgentCommission', minWidth: 180, title: Site.i18n.agent_commission_total},
+        {field: 'allOrderAmount', minWidth: 180, title: Site.i18n.order_total},
+        {field: 'allOrderCommission', minWidth: 180, title: Site.i18n.order_commission_total},
+        {field: 'sendPrize', minWidth: 180, title: Site.i18n.send_prize},
+        ...ipC,
+        {field: 'last_login_time', width: 160, title: Site.i18n.last_login_time},
+        {field: 'addtime', width: 160, fixed: 'right', title: Site.i18n.register_time, sort: true}
+      ]],
+      limits: [10, 15, 20],
+      limit: 20, page: true, skin: 'line',
+      done: () => {
+        $('.layuimini-main td[data-field=username]').each((_, e) => {
+          const id = Number($(e).prev().text().trim());
+          if (mapper[id]) $(e).addClass('with-children');
+        });
+      }
+    });
+    form.on('submit(search)', r => {
+      const params = r.field;
+      params.parent_id = pid = 0;
+      table.reload('list', {page: {curr: 1}, where: params}, 'data');
+      return false;
+    });
+    $('.layuimini-main').on('click', 'td.with-children', function () {
+      pid = Number($(this).prev().text().trim());
+      table.reload('list', {page: {curr: 1}, where: {parent_id: pid}}, 'data');
+    });
+  });
+</script>

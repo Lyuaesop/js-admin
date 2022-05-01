@@ -1,0 +1,173 @@
+
+<div class='layuimini-container layuimini-page-anim'>
+  <div class='layuimini-main'>
+    <!-- 处理级别路径#begin -->
+    <style>
+      .path{padding: 5px;font-weight: bold;margin: 0 0 10px 0;}
+      .path a{color: blue;}
+      th[data-field="rank"],td[data-field="rank"]{display: none!important;}
+    </style>
+    <div class="path">
+      <a href="javascript:;" parent_id="0">/root</a>
+      <span id="path"></span>
+    </div>
+    <!-- 处理级别路径#end -->
+    <fieldset class='table-search-fieldset'>
+      <legend t='search_tip'></legend>
+      <form class='layui-form'>
+        <div class='layui-form-item'>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='action_time'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' id='action_time' name='action_time' p='pls_select_action_time' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='register_time'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' id='register_time' name='register_time' p='pls_select_register_time' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='username'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' name='username' p='pls_input_username' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='rank'></label>
+            <div class='layui-input-inline'>
+              <select name='rank' id='ranks'></select>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='agent'></label>
+            <div class='layui-input-inline'>
+              <input class='layui-input' name='parent' p='pls_input_agent' autocomplete='off'/>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <label class='layui-form-label' t='member_type'></label>
+            <div class='layui-input-inline'>
+              <select name='type'>
+                <option value='0' selected t='all_member'></option>
+                <option value='1' t='normal_member'></option>
+                <option value='2' t='agent_member'></option>
+              </select>
+            </div>
+          </div>
+          <div class='layui-inline'>
+            <button type='submit' class='layui-btn layui-btn-primary' lay-submit lay-filter='search'><i class='layui-icon'></i> <span t='search'></span></button>
+            <button type='reset' class='layui-btn layui-btn-primary' t='search_reset'></button>
+          </div>
+        </div>
+      </form>
+    </fieldset>
+    <script type='text/html' id='tool'></script>
+    <table class='layui-hide' id='list' lay-filter='list'></table>
+  </div>
+</div>
+
+<style>
+  .layui-inline{margin-right:0 !important}
+  .layui-inline label{width:auto !important;padding:9px !important}
+  .layui-input-inline{width:auto !important;max-width:160px !important;margin:0 !important}
+  button[type=submit]{margin-left:10px}
+  td[data-field=username].with-children{color:deepskyblue;cursor:pointer}
+</style>
+
+<script>
+  layui.use(['jquery', 'form', 'table', 'element', 'laydate'], function () {
+    const $ = layui.jquery, form = layui.form, table = layui.table, laydate = layui.laydate, ranks = [];
+    for (let i = 0; i < (Site.platform === 'inner' ? 11 : 3); i++) ranks.push(`<option value='${i + 1}'>${i == 10 ? Site.i18n.others : (i + 1)}</option>`);
+    $('#ranks').html(ranks.join(''));
+    setTimeout(() => form.render(), 500);
+    laydate.render({elem: '#action_time', type: 'date', range: true, lang: localStorage.getItem('lang')});
+    laydate.render({elem: '#register_time', type: 'date', range: true, lang: localStorage.getItem('lang')});
+    let pid = 0, mapper = {};
+    const ipC = Site.platform === 'inner' ? [{field: 'ip', width: 120, title: Site.i18n.ip}] : [];
+    const nickC = Site.platform === 'inner' ? [{field: 'nickname', fixed: 'left', width: 120, title: Site.i18n.nickname}] : [];
+    table.render({
+      elem: '#list', method: 'get',
+      api: 'Agent_Agent.GetTeamUserReport',
+      where: {token: sessionStorage.getItem('token'), user_id: sessionStorage.getItem('uid'), lang: Site.lang},
+      request: {},
+      parseData: function (r) {
+        //处理级别路径#begin
+        const parent_tree = r.data.parent_tree && Type(r.data.parent_tree) === 'array' ? r.data.parent_tree : [];
+        const tree_arr = [];
+        const tree = parent_tree.map(v => {
+          tree_arr.push('<a href="javascript:;" parent_id="'+v.id+'">'+v.username+'</a>');
+        });
+        if(tree_arr.length>0){
+          $('#path').html(' / ' + tree_arr.join(' / '));
+        }else{
+          $('#path').html('');
+        }
+        //处理级别路径#end
+
+        const count = r.data.count && !isNaN(r.data.count) && r.data.count > 0 ? r.data.count : 0;
+        const items = r.data.data && Type(r.data.data) === 'array' ? r.data.data : [];
+        const list = items.map(v => {
+          mapper[v.id] = v.childs > 0;
+          v.nickname = v.nickname || '-';
+          v.addtime = Time('Y/M/D H:I:S', new Date(v.addtime * 1000));
+          if (v.last_login_time) v.last_login_time = Time('Y/M/D H:I:S', new Date(v.last_login_time * 1000));
+          return v;
+        });
+        return {code: r.ret == 200 ? 0 : r.ret, msg: r.msg, count: count, data: list};
+      },
+      toolbar: '#tool', defaultToolbar: ['filter', 'print'],
+      cols: [[
+        {field: 'id', width: 100, fixed: 'left', title: Site.i18n.user_id},
+        {field: 'username', width: 120, fixed: 'left', title: Site.i18n.username},
+        ...nickC,
+        {field: 'rank', width: 100, fixed: 'left', title: Site.i18n.rank},
+        {field: 'parent', width: 120, fixed: 'left', title: Site.i18n.parent_agent},
+        {field: 'level_name', width: 100, fixed: 'left', title: Site.i18n.member_level},
+        {field: 'balance', width: 80, title: Site.i18n.balance},
+        {field: 'allRecharge', minWidth: 180, title: Site.i18n.recharge_total},
+        {field: 'allWithdraw', minWidth: 180, title: Site.i18n.withdraw_total},
+        {field: 'allTips', minWidth: 180, title: Site.i18n.fee_total},
+        {field: 'allAgentCommission', minWidth: 180, title: Site.i18n.agent_commission_total},
+        {field: 'allOrderAmount', minWidth: 180, title: Site.i18n.order_total},
+        {field: 'allOrderCommission', minWidth: 180, title: Site.i18n.order_commission_total},
+        {field: 'sendPrize', minWidth: 180, title: Site.i18n.send_prize},
+        ...ipC,
+        {field: 'last_login_time', width: 160, title: Site.i18n.last_login_time},
+        {field: 'addtime', width: 160, fixed: 'right', title: Site.i18n.register_time, sort: true}
+      ]],
+      limits: [10, 15, 20],
+      limit: 20, page: true, skin: 'line',
+      done: () => {
+        $('.layuimini-main td[data-field=username]').each((_, e) => {
+          const id = Number($(e).prev().text().trim()), rank = Number($(e).next().text().trim());
+          if (mapper[id] && (Site.platform === 'inner' || rank < 3)) $(e).addClass('with-children');
+        });
+      }
+    });
+    form.on('submit(search)', r => {
+      const params = r.field;
+      const [aa, ab] = params.action_time.split(' - '), [ra, rb] = params.register_time.split(' - ');
+      params.c_start = aa || '';
+      params.c_end = ab || '';
+      params.register_start = ra || '';
+      params.register_end = rb || '';
+      params.parent_id = pid = 0;
+      delete params.action_time;
+      delete params.register_time;
+      table.reload('list', {page: {curr: 1}, where: params}, 'data');
+      return false;
+    });
+    $('.layuimini-main').on('click', 'td.with-children', function () {
+      pid = Number($(this).prev().text().trim());
+      table.reload('list', {page: {curr: 1}, where: {parent_id: pid}}, 'data');
+    });
+    //处理级别路径#begin
+    $('.path').on('click', 'a', function () {
+      pid = Number($(this).attr('parent_id'));
+      table.reload('list', {page: {curr: 1}, where: {parent_id: pid}}, 'data');
+    });
+    //处理级别路径#end
+  });
+</script>
